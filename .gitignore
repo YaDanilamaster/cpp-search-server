@@ -30,3 +30,10 @@
 *.exe
 *.out
 *.app
+/.vs/Y-Practic/v16/.suo
+/.vs/Y-Practic/v16/Browse.VC.db
+/.vs/Y-Practic/v16/Browse.VC.db-shm
+/.vs/Y-Practic/v16/Browse.VC.db-wal
+/.vs/Y-Practic/v16/Browse.VC.opendb
+/.vs/ProjectSettings.json
+/.vs/slnx.sqlite
