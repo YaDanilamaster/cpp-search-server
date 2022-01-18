@@ -94,7 +94,7 @@ void TestExcludeMinusWordsFromAddedDocumentContent() {
 		SearchServer server;
 		server.AddDocument(0, "next let set now how row coll", DocumentStatus::ACTUAL, { 1, 2, 3, 4 });
 		server.AddDocument(1, "lot not root bool cat set get", DocumentStatus::ACTUAL, { 2, 3, 4, 5 });
-		ASSERT_EQUAL(server.FindTopDocuments("set -lot")[0].id, 0);
+		ASSERT_EQUAL(server.FindTopDocuments("set -lot").size(), 1U);
 	}
 	{
 		SearchServer server;
@@ -102,8 +102,9 @@ void TestExcludeMinusWordsFromAddedDocumentContent() {
 		server.AddDocument(1, "lot not root bool cat set get", DocumentStatus::ACTUAL, { 2, 3, 4, 5 });
 		server.AddDocument(15, "see room in best dog of bag set", DocumentStatus::ACTUAL, { 2, 3, 4, 5 });
 		vector<Document> result = server.FindTopDocuments("set -lot");
-		ASSERT_EQUAL(result[0].id, 15);
 		ASSERT_EQUAL(result.size(), 2U);
+		ASSERT_EQUAL(result[0].id, 15);
+		ASSERT_EQUAL(result[1].id, 0U);
 	}
 }
 
@@ -123,7 +124,7 @@ void TestMatchDocument() {
 }
 
 // Проверяем вычисление рейтинга документов
-void TestRaitingDocuments() {
+void TestCalculationDocumentRating() {
 	SearchServer server;
 	server.AddDocument(0, "next let set now how next row coll", DocumentStatus::ACTUAL, { 1, 2, 3, 4 });
 	server.AddDocument(1, "lot not root bool cat set get next", DocumentStatus::ACTUAL, { 1, 2, 3, 4, 5 });
@@ -136,23 +137,29 @@ void TestRaitingDocuments() {
 	ASSERT_EQUAL_HINT(result[1].rating, (1 + 2 + 3 + 4) / 4, "Wrong rating");
 }
 
-// Проверяем вычисление релевантности документов и сортировку по релевантности
-void TestRelevanceAndSortingDocuments() {
+// Проверяем вычисление релевантности документов
+void TestCalculationDocumentRelevance() {
 	SearchServer server;
 	server.AddDocument(0, "a b c", DocumentStatus::ACTUAL, { 1, 2, 3, 4 });
 	server.AddDocument(1, "b c b", DocumentStatus::ACTUAL, { 1, 2, 3, 4, 5 });
 	server.AddDocument(2, "d e f", DocumentStatus::ACTUAL, { 1, 2, 5, 6, 7, 8 });
 	server.AddDocument(3, "q y b", DocumentStatus::ACTUAL, { 3, 5, 4 });
-
 	vector<Document> result = server.FindTopDocuments("b");
-
 	ASSERT_EQUAL_HINT(result[0].relevance, log(4.0 / 3.0) * (2.0 / 3.0), "Wrong relevance");
-	ASSERT_EQUAL_HINT(result[0].id, 1, "Wrong sorting to relevance");
-
 	ASSERT_EQUAL_HINT(result[1].relevance, log(4.0 / 3.0) * (1.0 / 3.0), "Wrong relevance");
-	ASSERT_EQUAL_HINT(result[1].id, 3, "Wrong sorting to relevance");
-
 	ASSERT_EQUAL_HINT(result[2].relevance, log(4.0 / 3.0) * (1.0 / 3.0), "Wrong relevance");
+}
+
+// Проверяем алгоритим сортировки документов
+void TestSortingDocumentsByRelevance() {
+	SearchServer server;
+	server.AddDocument(0, "a b c", DocumentStatus::ACTUAL, { 1, 2, 3, 4 });
+	server.AddDocument(1, "b c b", DocumentStatus::ACTUAL, { 1, 2, 3, 4, 5 });
+	server.AddDocument(2, "d e f", DocumentStatus::ACTUAL, { 1, 2, 5, 6, 7, 8 });
+	server.AddDocument(3, "q y b", DocumentStatus::ACTUAL, { 3, 5, 4 });
+	vector<Document> result = server.FindTopDocuments("b");
+	ASSERT_EQUAL_HINT(result[0].id, 1, "Wrong sorting to relevance");
+	ASSERT_EQUAL_HINT(result[1].id, 3, "Wrong sorting to relevance");
 	ASSERT_EQUAL_HINT(result[2].id, 0, "Wrong sorting to relevance");
 }
 
@@ -193,33 +200,33 @@ void TestDocumentSearchByPredicate() {
 	server.AddDocument(3, "lot not root bool cat set get next", DocumentStatus::REMOVED, { 1, 2, 3, 4, 5 });
 	server.AddDocument(6, "see room in best dog of bag bag bag bag bag bag", DocumentStatus::ACTUAL, { 1, 2, 5, 6, 7, 8 });
 
-	// Проверяем работу предиката на четных и не четных индексах документов
-	ASSERT_EQUAL(
-		server.FindTopDocuments("next set bag", [](const int document_id, const DocumentStatus status, const int rating) {
-			return document_id % 2 == 0; }).size(), 3U);
-	ASSERT_EQUAL(
-		server.FindTopDocuments("next set bag", [](const int document_id, const DocumentStatus status, const int rating) {
-			return document_id % 2 == 0; })[0].id, 6);
-	ASSERT_EQUAL(
-		server.FindTopDocuments("next set bag", [](const int document_id, const DocumentStatus status, const int rating) {
-			return document_id % 2 == 1; }).size(), 3U);
-	ASSERT_EQUAL(
-		server.FindTopDocuments("next set bag", [](const int document_id, const DocumentStatus status, const int rating) {
-			return document_id % 2 == 1; })[0].id, 15);
+	// Проверяем работу предиката на четных индексах документов
+	vector<Document> result = server.FindTopDocuments("next set bag",
+		[](const int document_id, const DocumentStatus status, const int rating) {
+			return document_id % 2 == 0; });
 
-	// Проверяем работу предиката на четных и не четных рейтингах документов
-	ASSERT_EQUAL(
-		server.FindTopDocuments("next set bag", [](const int document_id, const DocumentStatus status, const int rating) {
-			return rating % 2 == 0; }).size(), 4U);
-	ASSERT_EQUAL(
-		server.FindTopDocuments("next set bag", [](const int document_id, const DocumentStatus status, const int rating) {
-			return rating % 2 == 0; })[2].id, 0);
-	ASSERT_EQUAL(
-		server.FindTopDocuments("next set bag", [](const int document_id, const DocumentStatus status, const int rating) {
-			return rating % 2 == 1; }).size(), 2U);
-	ASSERT_EQUAL(
-		server.FindTopDocuments("next set bag", [](const int document_id, const DocumentStatus status, const int rating) {
-			return rating % 2 == 1; })[1].id, 3);
+	ASSERT_EQUAL(result.size(), 3U);
+	ASSERT_EQUAL(result[0].id, 6);
+	ASSERT_EQUAL(result[1].id, 0);
+	ASSERT_EQUAL(result[2].id, 2);
+
+	// Проверяем работу предиката на не четных рейтингах документов
+	result = server.FindTopDocuments("next set bag",
+		[](const int document_id, const DocumentStatus status, const int rating) {
+			return rating % 2 == 1; });
+
+	ASSERT_EQUAL(result.size(), 2U);
+	ASSERT_EQUAL(result[0].id, 1);
+	ASSERT_EQUAL(result[1].id, 3);
+
+	// Проверяем работу предиката для статуса документов
+	result = server.FindTopDocuments("next set bag",
+		[](const int document_id, const DocumentStatus status, const int rating) {
+			return status == DocumentStatus::REMOVED; });
+
+	ASSERT_EQUAL(result.size(), 2U);
+	ASSERT_EQUAL(result[0].id, 1);
+	ASSERT_EQUAL(result[1].id, 3);
 }
 
 template <typename Func>
@@ -236,8 +243,9 @@ void TestSearchServer() {
 	// Не забудьте вызывать остальные тесты здесь
 	RUN_TEST(TestExcludeMinusWordsFromAddedDocumentContent);
 	RUN_TEST(TestMatchDocument);
-	RUN_TEST(TestRaitingDocuments);
-	RUN_TEST(TestRelevanceAndSortingDocuments);
+	RUN_TEST(TestCalculationDocumentRating);
+	RUN_TEST(TestCalculationDocumentRelevance);
+	RUN_TEST(TestSortingDocumentsByRelevance);
 	RUN_TEST(TestMaxResultDocumentCount);
 	RUN_TEST(TestDocumentSearchByStatus);
 	RUN_TEST(TestDocumentSearchByPredicate);
