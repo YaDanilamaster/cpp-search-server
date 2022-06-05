@@ -3,8 +3,7 @@
 using namespace std;
 
 SearchServer::SearchServer(const std::string& stop_words_text)
-	: SearchServer(SplitIntoWords(stop_words_text))  // Invoke delegating constructor
-													 // from string container
+	: SearchServer(SplitIntoWords(stop_words_text))
 {
 }
 

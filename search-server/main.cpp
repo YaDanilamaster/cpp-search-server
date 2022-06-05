@@ -1,85 +1,79 @@
+#include "process_queries.h"
 #include "search_server.h"
-
-#include "log_duration.h"
 
 #include <execution>
 #include <iostream>
-#include <random>
 #include <string>
 #include <vector>
 
 using namespace std;
 
-string GenerateWord(mt19937& generator, int max_length) {
-    const int length = uniform_int_distribution(1, max_length)(generator);
-    string word;
-    word.reserve(length);
-    for (int i = 0; i < length; ++i) {
-        word.push_back(uniform_int_distribution<int>('a', 'z')(generator));
-    }
-    return word;
-}
-
-vector<string> GenerateDictionary(mt19937& generator, int word_count, int max_length) {
-    vector<string> words;
-    words.reserve(word_count);
-    for (int i = 0; i < word_count; ++i) {
-        words.push_back(GenerateWord(generator, max_length));
-    }
-    words.erase(unique(words.begin(), words.end()), words.end());
-    return words;
-}
-
-string GenerateQuery(mt19937& generator, const vector<string>& dictionary, int word_count, double minus_prob = 0) {
-    string query;
-    for (int i = 0; i < word_count; ++i) {
-        if (!query.empty()) {
-            query.push_back(' ');
-        }
-        if (uniform_real_distribution<>(0, 1)(generator) < minus_prob) {
-            query.push_back('-');
-        }
-        query += dictionary[uniform_int_distribution<int>(0, dictionary.size() - 1)(generator)];
-    }
-    return query;
-}
-
-vector<string> GenerateQueries(mt19937& generator, const vector<string>& dictionary, int query_count, int max_word_count) {
-    vector<string> queries;
-    queries.reserve(query_count);
-    for (int i = 0; i < query_count; ++i) {
-        queries.push_back(GenerateQuery(generator, dictionary, max_word_count));
-    }
-    return queries;
-}
-
-template <typename ExecutionPolicy>
-void Test(string_view mark, const SearchServer& search_server, const vector<string>& queries, ExecutionPolicy&& policy) {
-    LOG_DURATION(mark);
-    double total_relevance = 0;
-    for (const string_view query : queries) {
-        for (const auto& document : search_server.FindTopDocuments(policy, query)) {
-            total_relevance += document.relevance;
-        }
-    }
-    cout << total_relevance << endl;
-}
-
-#define TEST(policy) Test(#policy, search_server, queries, execution::policy)
-
 int main() {
-    mt19937 generator;
+	SearchServer search_server("and with"s);
 
-    const auto dictionary = GenerateDictionary(generator, 1000, 10);
-    const auto documents = GenerateQueries(generator, dictionary, 10'000, 70);
+	int id = 0;
+	for (
+		const string& text : {
+			"If you can keep your head when all about you"s,
+			"Are losing theirsand blaming it on you,"s,
+			"If you can trust yourself when all men doubt you,"s,
+			"But make allowance for their doubting too;"s,
+			"If you can wait and not be tired by waiting,"s,
+			"Or being lied about, don’t deal in lies,"s,
+			"Or being hated don’t give way to hating,"s,
+			"And yet don’t look too good, nor talk too wise :"s,
+			"If you can dream - and not make dreams your master;"s,
+			"If you can think - and not make thoughts your aim,"s,
+			"If you can meet with Triumphand Disaster"s,
+			"And treat those two impostors just the same;"s,
+			"If you can bear to hear the truth you’ve spoken"s,
+			"Twisted by knaves to make a trap for fools,"s,
+			"Or watch the things you gave your life to, broken,"s,
+			"And stoopand build ’em up with worn - out tools :"s,
+			"If you can make one heap of all your winnings"s,
+			"And risk it on one turn of pitch - and -toss,"s,
+			"And lose,and start again at your beginnings"s,
+			"And never breathe a word about your loss;"s,
+			"If you can force your heartand nerveand sinew"s,
+			"To serve your turn long after they are gone,"s,
+			"And so hold on when there is nothing in you"s,
+			"Except the Will which says to them : ‘Hold on!’"s,
+			"If you can talk with crowdsand keep your virtue,"s,
+			"Or walk with Kings - nor lose the common touch,"s,
+			"If neither foes nor loving friends can hurt you,"s,
+			"If all men count with you, but none too much;"s,
+			"If you can fill the unforgiving minute"s,
+			"With sixty seconds’ worth of distance run,"s,
+			"Yours is the Earthand everything that’s in it,"s,
+			"And - which is more - you’ll be a Man, my son!"s,
+		}
+		) {
+		search_server.AddDocument(++id, text, DocumentStatus::ACTUAL, { 1, 2 });
+	}
 
-    SearchServer search_server(dictionary[0]);
-    for (size_t i = 0; i < documents.size(); ++i) {
-        search_server.AddDocument(i, documents[i], DocumentStatus::ACTUAL, { 1, 2, 3 });
-    }
 
-    const auto queries = GenerateQueries(generator, dictionary, 100, 70);
+	cout << "ACTUAL by default, execution::seq:"s << endl;
+	// последовательная версия
+	for (const Document& document : search_server.FindTopDocuments("If you can"s)) {
+		PrintDocument(document);
+	}
+	cout << "\nBANNED, execution::seq:"s << endl;
+	// последовательная версия
+	for (const Document& document : search_server.FindTopDocuments(execution::seq, "If you can"s, DocumentStatus::BANNED)) {
+		PrintDocument(document);
+	}
 
-    TEST(seq);
-    TEST(par);
+	cout << "\nACTUAL by, even ids, execution::par:"s << endl;
+	// параллельная версия
+	for (const Document& document
+		: search_server.FindTopDocuments(execution::par,
+			"If you can"s,
+			[](int document_id, DocumentStatus status, int rating) {
+				return document_id % 2 == 0;
+			}))
+	{
+		PrintDocument(document);
+	}
+
+			return 0;
 }
