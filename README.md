@@ -12,3 +12,22 @@
 Поскольку проект учебный, сервер выполнен в виде консольного приложения, а данные хранятся в памяти.
 
 В проекте использована только STL, версия языка С++17.
+
+В представленном проекте приведен пример на основе стихотворения «If» написанного Редьярдом Киплингом. В примере сделан запрос на поиск словосочетания «If you can».
+
+В первой выдаче - 5 самых релевантных строк, в последней выдаче - самые релевантные строки среди четных.
+
+```
+ACTUAL by default, execution::seq:
+{ document_id = 11, relevance = 0.463734, rating = 1 }
+{ document_id = 29, relevance = 0.397486, rating = 1 }
+{ document_id = 1, relevance = 0.368319, rating = 1 }
+{ document_id = 21, relevance = 0.3478, rating = 1 }
+{ document_id = 25, relevance = 0.3478, rating = 1 }
+
+BANNED, execution::seq:
+
+ACTUAL by, even ids, execution::par:
+{ document_id = 10, relevance = 0.27824, rating = 1 }
+{ document_id = 28, relevance = 0.100087, rating = 1 }
+```
